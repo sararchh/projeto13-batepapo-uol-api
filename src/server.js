@@ -37,13 +37,13 @@ app.post('/participants', (req, res) => {
       name
     }).then((user) => {
       if (!user) {
-        insertParticipant();
+        insertParticipantDatabase();
       } else {
         return res.status(409).send({ error: "Usuário já cadastrado" });
       }
     });
 
-    const insertParticipant = () => {
+    const insertParticipantDatabase = () => {
       participants.insertOne({
         name,
         lastStatus: Date.now()
@@ -73,6 +73,52 @@ app.get('/participants', (req, res) => {
   db.collection("participants").find().toArray().then(users => {
     return res.send(users);
   });
+});
+
+app.post('/messages', (req, res) => {
+  try {
+    const { to, text, type } = req.body;
+    const { user } = req.headers;
+
+    const SchemaValidateToAndText = Joi.object({
+      to: Joi.string().min(3).required(),
+      text: Joi.string().min(1).required(),
+      type: Joi.string().valid('message', 'private_message')
+    });
+    const { error, value } = SchemaValidateToAndText.validate(req.body);
+
+    if (error) {
+      return res.status(422).send({ error: "Dados inválidos" });
+    }
+
+    if (!user) {
+      return res.status(422).send({ error: "Informe o usuário" });
+    }
+
+    db.collection("participants").findOne({
+      name: user
+    }).then(user => {
+      if (!user) {
+        return res.status(422).send({ message: 'Erro no remetente' });
+      }
+
+      insertMessageDatabase();
+      return res.sendStatus(201);
+    });
+
+    const insertMessageDatabase = () => {
+      db.collection("message").insertOne({
+        from: user,
+        to: to,
+        text: text,
+        type: type,
+        time: dayjs().format('hh:mm:ss')
+      });
+    }
+
+  } catch (error) {
+    return res.sendStatus(422);
+  }
 });
 
 const port = process.env.PORT || 5000;
