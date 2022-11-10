@@ -23,7 +23,7 @@ mongoClient.connect().then(() => {
 });
 
 
-app.post('/participants', (req, res) => {
+app.post('/participants', async (req, res) => {
   try {
     const { name } = req.body;
     const schema = Joi.object({ name: Joi.string().min(3).required() });
@@ -33,24 +33,15 @@ app.post('/participants', (req, res) => {
       return res.status(422).send({ error: "Informe o usuário válido" });
     }
 
-    participants.findOne({
-      name
-    }).then((user) => {
-      if (!user) {
-        insertParticipantDatabase();
-      } else {
-        return res.status(409).send({ error: "Usuário já cadastrado" });
-      }
-    });
+    const user = await participants.findOne({ name });
 
     const insertParticipantDatabase = () => {
       participants.insertOne({
         name,
         lastStatus: Date.now()
-      }).then(() => {
-        return res.sendStatus(201);
       });
       insertMessagePattern();
+      return res.sendStatus(201);
     }
 
     const insertMessagePattern = () => {
@@ -63,19 +54,30 @@ app.post('/participants', (req, res) => {
       });
     }
 
+    if (!user) {
+      insertParticipantDatabase();
+    } else {
+      return res.status(409).send({ error: "Usuário já cadastrado" });
+    }
+
   } catch (error) {
+    console.log('error', error);
     return res.sendStatus(422);
   }
 
 });
 
-app.get('/participants', (req, res) => {
-  db.collection("participants").find().toArray().then(users => {
+app.get('/participants', async (req, res) => {
+  try {
+    const users = await db.collection("participants").find().toArray()
     return res.send(users);
-  });
+  } catch (error) {
+    console.log('error', error);
+    return res.sendStatus(422);
+  }
 });
 
-app.post('/messages', (req, res) => {
+app.post('/messages', async (req, res) => {
   try {
     const { to, text, type } = req.body;
     const { user } = req.headers;
@@ -95,16 +97,11 @@ app.post('/messages', (req, res) => {
       return res.status(422).send({ error: "Informe o usuário" });
     }
 
-    db.collection("participants").findOne({
-      name: user
-    }).then(user => {
-      if (!user) {
-        return res.status(422).send({ message: 'Erro no remetente' });
-      }
+    const users = await db.collection("participants").findOne({ name: user });
 
-      insertMessageDatabase();
-      return res.sendStatus(201);
-    });
+    if (!users) {
+      return res.status(422).send({ message: 'Erro no remetente' });
+    }
 
     const insertMessageDatabase = () => {
       db.collection("message").insertOne({
@@ -116,9 +113,25 @@ app.post('/messages', (req, res) => {
       });
     }
 
+    insertMessageDatabase();
+    return res.sendStatus(201);
+
   } catch (error) {
     return res.sendStatus(422);
   }
+});
+
+//TODO
+app.get('/messages', (req, res) => {
+  const { user } = req.headers;
+
+  db.collection("message").find({ from: user }, { to: user }).toArray().then(item => {
+    console.log('item', item);
+  });
+
+
+
+  res.sendStatus(201)
 });
 
 const port = process.env.PORT || 5000;
