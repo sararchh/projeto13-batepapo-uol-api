@@ -121,17 +121,26 @@ app.post('/messages', async (req, res) => {
   }
 });
 
-//TODO
-app.get('/messages', (req, res) => {
-  const { user } = req.headers;
+app.get('/messages', async (req, res) => {
+  try {
+    const { user } = req.headers;
+    const { limit } = req.query;
 
-  db.collection("message").find({ from: user }, { to: user }).toArray().then(item => {
-    console.log('item', item);
-  });
+    const messageUserToAndFrom = await db.collection("message").find({
+      $or: [{ from: user }, { to: user }]
+    }).toArray();
 
+    if (!limit) {
+      return res.send(messageUserToAndFrom);
+    }
 
+    res.send([...messageUserToAndFrom].slice(-limit));
 
-  res.sendStatus(201)
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(422);
+  }
+
 });
 
 const port = process.env.PORT || 5000;
