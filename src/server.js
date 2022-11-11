@@ -26,8 +26,8 @@ mongoClient.connect().then(() => {
 app.post('/participants', async (req, res) => {
   try {
     const { name } = req.body;
-    const schema = Joi.object({ name: Joi.string().min(3).required() });
-    const { error, value } = schema.validate(req.body);
+    const schema = Joi.object({ name: Joi.string().min(3).required().trim() });
+    const { error, value } = schema.validate(req.body, { abortEarly: false });
 
     if (error) {
       return res.status(422).send({ error: "Informe o usuário válido" });
@@ -83,11 +83,11 @@ app.post('/messages', async (req, res) => {
     const { user } = req.headers;
 
     const SchemaValidateToAndText = Joi.object({
-      to: Joi.string().min(3).required(),
-      text: Joi.string().min(1).required(),
-      type: Joi.string().valid('message', 'private_message')
+      to: Joi.string().trim().min(3).required(),
+      text: Joi.string().trim().required(),
+      type: Joi.string().trim().valid('message', 'private_message')
     });
-    const { error, value } = SchemaValidateToAndText.validate(req.body);
+    const { error, value } = SchemaValidateToAndText.validate(req.body, { abortEarly: false });
 
     if (error) {
       return res.status(422).send({ error: "Dados inválidos" });
@@ -160,6 +160,23 @@ app.post('/status', async (req, res) => {
     res.sendStatus(404);
   }
 });
+
+setInterval(() => removeParticipants(), 15000);
+
+const removeParticipants = async () => {
+  try {
+    const response = await db.collection("participants").find().toArray();
+
+    const timestampAtual = new Date().getTime();
+
+    setTimeout(async () => {
+      await db.collection("participants").remove({ lastStatus: { $lte: timestampAtual } });
+    }, 10000);
+
+  } catch (error) {
+    console.log('error', error);
+  }
+};
 
 const port = process.env.PORT || 5000;
 
