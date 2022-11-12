@@ -3,6 +3,8 @@ import cors from 'cors';
 import { MongoClient } from "mongodb";
 import dotenv from 'dotenv';
 
+import { stripHtml } from "string-strip-html"
+
 import Joi from 'joi';
 import dayjs from 'dayjs';
 
@@ -26,18 +28,21 @@ mongoClient.connect().then(() => {
 app.post('/participants', async (req, res) => {
   try {
     const { name } = req.body;
-    const schema = Joi.object({ name: Joi.string().min(3).required().trim() });
-    const { error, value } = schema.validate(req.body, { abortEarly: false });
+    const schema = Joi.object({ name: Joi.string().min(3).required() });
+    const { error } = schema.validate(req.body, { abortEarly: false });
+
+    const description = stripHtml(name).result.trim();
 
     if (error) {
       return res.status(422).send({ error: "Informe o usuário válido" });
     }
 
-    const user = await participants.findOne({ name });
+    const user = await participants.findOne({ description });
+    console.log('user', user);
 
     const insertParticipantDatabase = () => {
       participants.insertOne({
-        name,
+        description,
         lastStatus: Date.now()
       });
       insertMessagePattern();
@@ -83,11 +88,11 @@ app.post('/messages', async (req, res) => {
     const { user } = req.headers;
 
     const SchemaValidateToAndText = Joi.object({
-      to: Joi.string().trim().min(3).required(),
-      text: Joi.string().trim().required(),
-      type: Joi.string().trim().valid('message', 'private_message')
+      to: Joi.string().min(3).required(),
+      text: Joi.string().required(),
+      type: Joi.string().valid('message', 'private_message')
     });
-    const { error, value } = SchemaValidateToAndText.validate(req.body, { abortEarly: false });
+    const { error } = SchemaValidateToAndText.validate(req.body, { abortEarly: false });
 
     if (error) {
       return res.status(422).send({ error: "Dados inválidos" });
@@ -175,7 +180,7 @@ const removeParticipants = async () => {
       const nameUser = value?.name;
 
       if (nameUser !== undefined) {
-       const resp = await message.insertOne({
+        const resp = await message.insertOne({
           from: nameUser,
           to: 'Todos',
           text: 'sai da sala...',
