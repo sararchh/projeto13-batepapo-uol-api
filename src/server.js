@@ -38,11 +38,10 @@ app.post('/participants', async (req, res) => {
     }
 
     const user = await participants.findOne({ description });
-    console.log('user', user);
 
     const insertParticipantDatabase = () => {
       participants.insertOne({
-        description,
+        name: description,
         lastStatus: Date.now()
       });
       insertMessagePattern();
@@ -110,10 +109,10 @@ app.post('/messages', async (req, res) => {
 
     const insertMessageDatabase = () => {
       db.collection("message").insertOne({
-        from: user,
-        to: to,
-        text: text,
-        type: type,
+        from: stripHtml(user).result.trim(),
+        to: stripHtml(to).result.trim(),
+        text: stripHtml(text).result.trim(),
+        type: stripHtml(type).result.trim(),
         time: dayjs().format('hh:mm:ss')
       });
     }
