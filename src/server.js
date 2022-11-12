@@ -74,7 +74,7 @@ app.post('/participants', async (req, res) => {
 
 app.get('/participants', async (req, res) => {
   try {
-    const users = await db.collection("participants").find().toArray()
+    const users = await participants.find().toArray()
     return res.send(users);
   } catch (error) {
     console.log('error', error);
@@ -102,14 +102,14 @@ app.post('/messages', async (req, res) => {
       return res.status(422).send({ error: "Informe o usuário" });
     }
 
-    const users = await db.collection("participants").findOne({ name: user });
+    const users = await participants.findOne({ name: user });
 
     if (!users) {
       return res.status(422).send({ message: 'Erro no remetente' });
     }
 
     const insertMessageDatabase = () => {
-      db.collection("message").insertOne({
+      message.insertOne({
         from: stripHtml(user).result.trim(),
         to: stripHtml(to).result.trim(),
         text: stripHtml(text).result.trim(),
@@ -131,7 +131,7 @@ app.get('/messages', async (req, res) => {
     const { user } = req.headers;
     const { limit } = req.query;
 
-    const messageUserToAndFrom = await db.collection("message").find({
+    const messageUserToAndFrom = await message.find({
       $or: [{ from: user }, { to: user }]
     }).toArray();
 
@@ -152,13 +152,13 @@ app.post('/status', async (req, res) => {
   try {
     const { user } = req.headers;
 
-    const users = await db.collection("participants").findOne({ name: user });
+    const users = await participants.findOne({ name: user });
 
     if (!users) {
       return res.sendStatus(404);
     }
 
-    db.collection("participants").updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
+    participants.updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
 
   } catch (error) {
     console.log(error);
@@ -190,21 +190,68 @@ app.delete('/messages/:id', async (req, res) => {
   }
 });
 
+app.put('/messages/:id', async (req, res) => {
+  const { to, text, type } = req.body;
+  const { user } = req.headers;
+  const { id } = req.params;
+
+  try {
+    const SchemaValidateToAndText = Joi.object({
+      to: Joi.string().min(3).required(),
+      text: Joi.string().required(),
+      type: Joi.string().valid('message', 'private_message')
+    });
+    const { error } = SchemaValidateToAndText.validate(req.body, { abortEarly: false });
+
+    if (error) {
+      return res.status(422).send({ error: "Dados inválidos" });
+    }
+
+    if (!user) {
+      return res.status(422).send({ error: "Informe o usuário" });
+    }
+
+    const userExists = await message.findOne({ from: user });
+
+    if (!userExists) {
+      return res.status(422).send({ error: "Informe o usuário válido" });
+    }
+
+    const messageExists = await message.findOne({ _id: new ObjectId(id) });
+    console.log('messageExists', messageExists?.from);
+
+    if (messageExists?.from !== user) {
+      return res.sendStatus(401);
+    }
+
+    if (!messageExists) {
+      return res.sendStatus(404);
+    }
+
+    await message.updateOne({ _id: new ObjectId(id) }, { $set: req.body });
+    res.sendStatus(200);
+
+  } catch (error) {
+    res.sendStatus(404);
+  }
+
+});
+
 setInterval(() => removeParticipants(), 15000);
 
 const removeParticipants = async () => {
   try {
-    await db.collection("participants").find().toArray();
+    await participants.find().toArray();
 
     const timestampAtual = new Date().getTime();
 
     setTimeout(async () => {
-      const { value } = await db.collection("participants").findOneAndDelete({ lastStatus: { $lte: timestampAtual } });
+      const { value } = await participants.findOneAndDelete({ lastStatus: { $lte: timestampAtual } });
 
       const nameUser = value?.name;
 
       if (nameUser !== undefined) {
-        const resp = await message.insertOne({
+        await message.insertOne({
           from: nameUser,
           to: 'Todos',
           text: 'sai da sala...',
