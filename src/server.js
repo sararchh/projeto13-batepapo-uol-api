@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { MongoClient } from "mongodb";
 import dotenv from 'dotenv';
+import { ObjectId } from "bson";
+import { MongoClient } from "mongodb";
 
 import { stripHtml } from "string-strip-html"
 
@@ -158,9 +159,33 @@ app.post('/status', async (req, res) => {
     }
 
     db.collection("participants").updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
-    res.sendStatus(200);
+
   } catch (error) {
     console.log(error);
+    res.sendStatus(404);
+  }
+});
+
+app.delete('/messages/:id', async (req, res) => {
+  const { id } = req.params;
+  const { user } = req.headers;
+
+  try {
+    const messageExists = await message.findOne({ _id: new ObjectId(id) });
+
+    if (!messageExists) {
+      return res.sendStatus(404);
+    }
+
+    if (messageExists?.from !== user) {
+      return res.sendStatus(401);
+    }
+
+    await message.deleteOne({ _id: new ObjectId(id) });
+
+    res.status(200).send({ message: "Documento apagado com sucesso!" });
+
+  } catch (error) {
     res.sendStatus(404);
   }
 });
