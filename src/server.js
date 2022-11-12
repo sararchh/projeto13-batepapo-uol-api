@@ -218,7 +218,6 @@ app.put('/messages/:id', async (req, res) => {
     }
 
     const messageExists = await message.findOne({ _id: new ObjectId(id) });
-    console.log('messageExists', messageExists?.from);
 
     if (messageExists?.from !== user) {
       return res.sendStatus(401);
