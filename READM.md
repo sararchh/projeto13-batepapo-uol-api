@@ -1,6 +1,5 @@
 <h2  align="center">
 
-<img  alt="cover-alt"  src=".github/image.png" />
 
 </h2>
 
