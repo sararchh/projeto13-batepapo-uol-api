@@ -165,12 +165,25 @@ setInterval(() => removeParticipants(), 15000);
 
 const removeParticipants = async () => {
   try {
-    const response = await db.collection("participants").find().toArray();
+    await db.collection("participants").find().toArray();
 
     const timestampAtual = new Date().getTime();
 
     setTimeout(async () => {
-      await db.collection("participants").remove({ lastStatus: { $lte: timestampAtual } });
+      const { value } = await db.collection("participants").findOneAndDelete({ lastStatus: { $lte: timestampAtual } });
+
+      const nameUser = value?.name;
+
+      if (nameUser !== undefined) {
+       const resp = await message.insertOne({
+          from: nameUser,
+          to: 'Todos',
+          text: 'sai da sala...',
+          type: 'status',
+          time: dayjs().format('hh:mm:ss')
+        });
+      }
+
     }, 10000);
 
   } catch (error) {
