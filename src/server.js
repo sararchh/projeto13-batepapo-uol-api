@@ -132,7 +132,7 @@ app.get('/messages', async (req, res) => {
     const { limit } = req.query;
 
     const messageUserToAndFrom = await message.find({
-      $or: [{ from: user }, { to: user }]
+      $or: [{ from: user }, { to: user }, {type: "message"}]
     }).toArray();
 
     if (!limit) {
